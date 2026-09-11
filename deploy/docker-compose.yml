@@ -1,0 +1,18 @@
+version: "3.8"
+
+services:
+  adas-req-platform:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: adas-req-platform
+    ports:
+      - "3002:3002"
+    volumes:
+      # 独立数据目录：与 xhs-platform 的数据完全隔离
+      - /opt/adas-req/data:/app/data
+    environment:
+      - PORT=3002
+      - DATA_DIR=/app/data
+      - JWT_SECRET=${JWT_SECRET:-adas-req-cloud-secret-change-me}
+    restart: unless-stopped
