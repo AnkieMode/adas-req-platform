@@ -4,5 +4,7 @@ dist/
 *.db-wal
 *.db-shm
 server/data/
+data/
+.deploy/
 .env
 .DS_Store
