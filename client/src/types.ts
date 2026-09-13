@@ -1,6 +1,6 @@
 // 类型与常量（与后端 risk.js 保持一致）
 export type Status =
-  | 'draft' | 'new' | 'transmitted' | 'in_review'
+  | 'transmitted' | 'changed' | 'in_review'
   | 'to_be_clarified' | 'rejection_tbc' | 'accepted' | 'cancelled';
 
 export type Risk = 'red' | 'yellow' | 'green' | 'none';
@@ -49,14 +49,13 @@ export interface UserInfo {
 }
 
 export const STATUS_ORDER: Status[] = [
-  'draft', 'new', 'transmitted', 'in_review',
+  'transmitted', 'changed', 'in_review',
   'to_be_clarified', 'rejection_tbc', 'accepted', 'cancelled',
 ];
 
 export const STATUS_LABELS: Record<Status, string> = {
-  draft: '草稿',
-  new: '新建',
   transmitted: '已发送华为',
+  changed: '已变更',
   in_review: '华为打标中',
   to_be_clarified: '待澄清',
   rejection_tbc: '拒绝待澄清',
@@ -65,9 +64,8 @@ export const STATUS_LABELS: Record<Status, string> = {
 };
 
 export const STATUS_COLORS: Record<Status, string> = {
-  draft: '#d9d9d9',
-  new: '#8c8c8c',
   transmitted: '#1677ff',
+  changed: '#faad14',
   in_review: '#722ed1',
   to_be_clarified: '#fa8c16',
   rejection_tbc: '#eb2f96',
@@ -98,9 +96,8 @@ export const RISK_COLORS: Record<Risk, string> = {
 };
 
 export const TRANSITIONS: Record<Status, Status[]> = {
-  draft: ['new', 'cancelled'],
-  new: ['transmitted', 'cancelled'],
-  transmitted: ['in_review', 'to_be_clarified', 'cancelled'],
+  transmitted: ['in_review', 'to_be_clarified', 'changed', 'cancelled'],
+  changed: ['transmitted', 'cancelled'],
   in_review: ['accepted', 'to_be_clarified', 'rejection_tbc', 'cancelled'],
   to_be_clarified: ['transmitted', 'accepted', 'cancelled'],
   rejection_tbc: ['transmitted', 'accepted', 'cancelled'],
