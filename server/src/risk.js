@@ -4,9 +4,8 @@
 // 华为侧反馈: TO_BE_CLARIFIED / IN_REVIEW / ACCEPTED / REJECTED / N/A
 
 const STATUSES = [
-  'draft',            // 草稿：内容未生效
-  'new',              // 新建：需求/信息/标题已生效
   'transmitted',      // 已发送华为：正式发出，计时开始（7 日内须打标回传）
+  'changed',          // 已变更：需求内容变更，待重新发送
   'in_review',        // 华为打标中：依赖 MDC 内其他需求暂无法定案
   'to_be_clarified',  // 待澄清：华为已打标，依赖其他系统部件需求，需 VWG 对齐
   'rejection_tbc',    // 拒绝待澄清：华为拒绝，OEM 未接受
@@ -15,9 +14,8 @@ const STATUSES = [
 ];
 
 const STATUS_LABELS = {
-  draft: '草稿',
-  new: '新建',
   transmitted: '已发送华为',
+  changed: '已变更',
   in_review: '华为打标中',
   to_be_clarified: '待澄清',
   rejection_tbc: '拒绝待澄清',
@@ -27,9 +25,8 @@ const STATUS_LABELS = {
 
 // 允许的状态流转（看板拖拽 / 编辑校验）
 const TRANSITIONS = {
-  draft: ['new', 'cancelled'],
-  new: ['transmitted', 'cancelled'],
-  transmitted: ['in_review', 'to_be_clarified', 'cancelled'],
+  transmitted: ['in_review', 'to_be_clarified', 'changed', 'cancelled'],
+  changed: ['transmitted', 'cancelled'],
   in_review: ['accepted', 'to_be_clarified', 'rejection_tbc', 'cancelled'],
   to_be_clarified: ['transmitted', 'accepted', 'cancelled'],
   rejection_tbc: ['transmitted', 'accepted', 'cancelled'],
