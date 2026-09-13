@@ -14,7 +14,7 @@ import { HwSwTag, RiskTag } from '../components/Tags';
 function CardItem({ m, onClick, dragging }: { m: Module; onClick: () => void; dragging?: boolean }) {
   return (
     <div className={`kanban-card${dragging ? ' dragging' : ''}`} onClick={onClick}>
-      <div style={{ fontFamily: 'monospace', fontSize: 11, marginBottom: 4, wordBreak: 'break-all' }}>
+      <div style={{ fontSize: 12, marginBottom: 4, wordBreak: 'break-all', lineHeight: 1.4 }}>
         {m.module_name}
       </div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: '#8c8c8c' }}>
@@ -31,7 +31,7 @@ function DraggableCard({ m }: { m: Module }) {
   return (
     <div ref={setNodeRef} {...listeners} {...attributes}>
       <div className={`kanban-card${m.id === selectedId ? ' selected' : ''}${isDragging ? ' dragging' : ''}`} onClick={() => select(m.id)}>
-        <div style={{ fontFamily: 'monospace', fontSize: 11, marginBottom: 4, wordBreak: 'break-all' }}>
+        <div style={{ fontSize: 12, marginBottom: 4, wordBreak: 'break-all', lineHeight: 1.4 }}>
           {m.module_name}
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 11, color: '#8c8c8c' }}>
