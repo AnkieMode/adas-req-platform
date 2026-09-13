@@ -58,23 +58,25 @@ export default function ModuleList() {
         rowClassName={(r) => (r.id === selectedId ? 'ant-table-row-selected' : '')}
         onRow={(r) => ({ onClick: () => select(r.id), style: { cursor: 'pointer' } })}
         columns={[
-          { title: '#', dataIndex: 'seq', width: 40 },
+          { title: '#', dataIndex: 'seq', width: 45 },
           {
-            title: '模块名称', dataIndex: 'module_name',
-            render: (v: string) => <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{v}</span>,
+            title: '模块名称', dataIndex: 'module_name', ellipsis: { showTitle: false },
+            render: (v: string) => (
+              <span style={{ fontSize: 13 }} title={v}>{v}</span>
+            ),
           },
-          { title: 'HW/SW', dataIndex: 'hwsw', width: 80, render: (v) => <HwSwTag hwsw={v} />, filters: [{ text: 'HW', value: 'HW' }, { text: 'SW', value: 'SW' }], onFilter: (v, r) => r.hwsw === v },
-          { title: 'FO', dataIndex: 'fo_name', width: 130 },
-          { title: '状态', dataIndex: 'status', width: 110, render: (v: Status) => <StatusTag status={v} /> },
-          { title: '华为侧', dataIndex: 'supplier_status', width: 90, render: (v: string) => v || '—' },
+          { title: 'HW/SW', dataIndex: 'hwsw', width: 75, render: (v) => <HwSwTag hwsw={v} />, filters: [{ text: 'HW', value: 'HW' }, { text: 'SW', value: 'SW' }], onFilter: (v, r) => r.hwsw === v },
+          { title: 'FO', dataIndex: 'fo_name', width: 110, ellipsis: true },
+          { title: '状态', dataIndex: 'status', width: 105, render: (v: Status) => <StatusTag status={v} /> },
+          { title: '华为侧', dataIndex: 'supplier_status', width: 85, render: (v: string) => v || '—' },
           { title: '发送日期', dataIndex: 'sent_at', width: 100, render: (v) => v || '—' },
           { title: '打标截止', dataIndex: 'deadline_at', width: 100, render: (v) => v || '—' },
           {
-            title: '打标风险', key: 'risk', width: 120,
+            title: '打标风险', key: 'risk', width: 110,
             render: (_, r) => <RiskTag risk={r.risk} days={r.days_elapsed} />,
             sorter: (a, b) => (['red', 'yellow', 'green', 'none'].indexOf(a.risk || 'none') - ['red', 'yellow', 'green', 'none'].indexOf(b.risk || 'none')),
           },
-          { title: '需求数', dataIndex: 'total_reqs', width: 70, sorter: (a, b) => a.total_reqs - b.total_reqs },
+          { title: '需求数', dataIndex: 'total_reqs', width: 80, sorter: (a, b) => a.total_reqs - b.total_reqs },
           { title: '接受', dataIndex: 'accepted_reqs', width: 60 },
         ]}
       />
