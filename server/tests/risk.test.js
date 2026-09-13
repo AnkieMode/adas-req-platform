@@ -27,7 +27,7 @@ test('已打标 / 非计时状态不参与风险计算', () => {
   assert.equal(riskLevel({ status: 'transmitted', sent_at: daysAgo(30), labeled_at: daysAgo(20) }), 'none');
   assert.equal(riskLevel({ status: 'to_be_clarified', sent_at: daysAgo(30) }), 'none');
   assert.equal(riskLevel({ status: 'accepted', sent_at: daysAgo(30) }), 'none');
-  assert.equal(riskLevel({ status: 'new', sent_at: null }), 'none');
+  assert.equal(riskLevel({ status: 'changed', sent_at: null }), 'none');
 });
 
 test('打标截止日 = 发送日 + 7 天', () => {
@@ -36,13 +36,12 @@ test('打标截止日 = 发送日 + 7 天', () => {
 });
 
 test('状态流转规则（依据 requirement exchange guideline）', () => {
-  assert.ok(canTransition('draft', 'new'));
-  assert.ok(canTransition('new', 'transmitted'));
   assert.ok(canTransition('transmitted', 'in_review'));
+  assert.ok(canTransition('transmitted', 'changed')); // 变更后待重发
+  assert.ok(canTransition('changed', 'transmitted')); // 重发重新计时
   assert.ok(canTransition('to_be_clarified', 'transmitted')); // 澄清后重新发送
   assert.ok(canTransition('rejection_tbc', 'cancelled'));
-  assert.ok(!canTransition('accepted', 'new')); // 终态不可流转
-  assert.ok(!canTransition('draft', 'accepted')); // 不能跳过流程
+  assert.ok(!canTransition('accepted', 'transmitted')); // 终态不可流转
   assert.ok(!canTransition('transmitted', 'accepted')); // 必须经打标环节
 });
 
