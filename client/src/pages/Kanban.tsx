@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { App as AntApp } from 'antd';
 import {
   DndContext, PointerSensor, useSensor, useSensors, useDraggable, useDroppable,
@@ -10,6 +10,7 @@ import { useLinkage } from '../store';
 import { STATUS_ORDER, STATUS_LABELS, STATUS_COLORS, TRANSITIONS } from '../types';
 import type { Module, Status } from '../types';
 import { HwSwTag, RiskTag } from '../components/Tags';
+import { currentUser } from '../App';
 
 function CardItem({ m, onClick, dragging }: { m: Module; onClick: () => void; dragging?: boolean }) {
   return (
@@ -25,11 +26,11 @@ function CardItem({ m, onClick, dragging }: { m: Module; onClick: () => void; dr
   );
 }
 
-function DraggableCard({ m }: { m: Module }) {
-  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: m.id, data: { module: m } });
+function DraggableCard({ m, canDrag }: { m: Module; canDrag: boolean }) {
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({ id: m.id, disabled: !canDrag, data: { module: m } });
   const { selectedId, select } = useLinkage();
   return (
-    <div ref={setNodeRef} {...listeners} {...attributes}>
+    <div ref={setNodeRef} {...listeners} {...attributes} style={{ cursor: canDrag ? 'grab' : 'pointer' }}>
       <div className={`kanban-card${m.id === selectedId ? ' selected' : ''}${isDragging ? ' dragging' : ''}`} onClick={() => select(m.id)}>
         <div style={{ fontSize: 12, marginBottom: 4, wordBreak: 'break-all', lineHeight: 1.4 }}>
           {m.module_name}
@@ -43,7 +44,7 @@ function DraggableCard({ m }: { m: Module }) {
   );
 }
 
-function Column({ status, modules }: { status: Status; modules: Module[] }) {
+function Column({ status, modules, canDrag }: { status: Status; modules: Module[]; canDrag: boolean }) {
   const { setNodeRef, isOver } = useDroppable({ id: `col-${status}` });
   return (
     <div className={`kanban-col${isOver ? ' drag-over' : ''}`} ref={setNodeRef}>
@@ -51,7 +52,7 @@ function Column({ status, modules }: { status: Status; modules: Module[] }) {
         <span style={{ color: STATUS_COLORS[status] }}>● {STATUS_LABELS[status]}</span>
         <span style={{ color: '#8c8c8c' }}>{modules.length}</span>
       </div>
-      {modules.map((m) => <DraggableCard key={m.id} m={m} />)}
+      {modules.map((m) => <DraggableCard key={m.id} m={m} canDrag={canDrag} />)}
     </div>
   );
 }
@@ -62,6 +63,54 @@ export default function Kanban() {
   const { message } = AntApp.useApp();
   const [activeId, setActiveId] = useState<number | null>(null);
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const user = currentUser();
+  const canDrag = !!user && ['admin', 'editor', 'supplier'].includes(user.role);
+
+  // 横向拖动平移：按住空白处左右拖拽；滚轮纵向滚动转为横向切换
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    let down = false, startX = 0, startLeft = 0, moved = false;
+    const onDown = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      if ((e.target as HTMLElement).closest('.kanban-card')) return; // 卡片拖拽不受影响
+      down = true; moved = false;
+      startX = e.pageX; startLeft = el.scrollLeft;
+      el.classList.add('panning');
+    };
+    const onMove = (e: MouseEvent) => {
+      if (!down) return;
+      const dx = e.pageX - startX;
+      if (Math.abs(dx) > 3) moved = true;
+      el.scrollLeft = startLeft - dx;
+    };
+    const onUp = () => { down = false; el.classList.remove('panning'); };
+    const onClick = (e: MouseEvent) => {
+      if (moved && !(e.target as HTMLElement).closest('.kanban-card')) {
+        e.stopPropagation(); e.preventDefault();
+      }
+    };
+    const onWheel = (e: WheelEvent) => {
+      // 鼠标滚轮：优先横向切换状态列；按住 Shift 时不拦截
+      if (e.deltaY !== 0 && !e.shiftKey && !e.altKey && !e.ctrlKey && !e.metaKey) {
+        e.preventDefault();
+        el.scrollLeft += e.deltaY + e.deltaX;
+      }
+    };
+    el.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+    el.addEventListener('click', onClick, true);
+    el.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      el.removeEventListener('mousedown', onDown);
+      window.removeEventListener('mousemove', onMove);
+      window.removeEventListener('mouseup', onUp);
+      el.removeEventListener('click', onClick, true);
+      el.removeEventListener('wheel', onWheel);
+    };
+  }, []);
 
   const { data } = useQuery({
     queryKey: ['modules', filters],
@@ -102,8 +151,11 @@ export default function Kanban() {
         moveMutation.mutate({ id: m.id, to });
       }}
     >
-      <div className="kanban-scroll">
-        {STATUS_ORDER.map((s) => <Column key={s} status={s} modules={byStatus(s)} />)}
+      <div style={{ marginBottom: 8, color: '#8c8c8c', fontSize: 12 }}>
+        🖱️ 按住空白处左右拖动，或滚动鼠标滚轮切换查看状态列{canDrag ? ' · 拖拽卡片可流转状态' : ' · 当前账号只可查看'}
+      </div>
+      <div className="kanban-scroll" ref={scrollRef}>
+        {STATUS_ORDER.map((s) => <Column key={s} status={s} modules={byStatus(s)} canDrag={canDrag} />)}
       </div>
       <DragOverlay>
         {activeModule ? (
