@@ -1,8 +1,7 @@
 import React from 'react';
-import { Card, Col, Row, Statistic, Table, Typography, Tag, List } from 'antd';
+import { Card, Col, Row, Statistic, List } from 'antd';
 import { useQuery } from '@tanstack/react-query';
 import ReactECharts from 'echarts-for-react';
-import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 import { useLinkage } from '../store';
 import { STATUS_LABELS, STATUS_COLORS, RISK_LABELS, RISK_COLORS } from '../types';
@@ -18,12 +17,15 @@ interface Stats {
   fo_stats: { fo: string; count: number; open: number }[];
   req_total: number;
   req_accepted: number;
+  req_rejected: number;
+  req_na: number;
+  req_tbc: number;
+  req_outstanding: number;
 }
 
 export default function Dashboard() {
   const { data: s } = useQuery({ queryKey: ['stats'], queryFn: () => api.get('/stats').then((r) => r.data as Stats) });
   const { select } = useLinkage();
-  const navigate = useNavigate();
   if (!s) return null;
 
   const inFlow = s.total - (s.by_status['accepted'] || 0) - (s.by_status['cancelled'] || 0);
@@ -66,6 +68,34 @@ export default function Dashboard() {
     }],
   };
 
+  // 需求条目统计图（华为打标结果口径）
+  const reqOption = {
+    title: {
+      text: '需求条目统计（华为打标结果）',
+      subtext: '数据口径：2026年6月',
+      left: 'center', textStyle: { fontSize: 14 }, subtextStyle: { fontSize: 11, color: '#8c8c8c' },
+    },
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    grid: { left: 90, right: 60, top: 56, bottom: 24 },
+    xAxis: { type: 'value' },
+    yAxis: {
+      type: 'category',
+      data: ['未完成', '待澄清', '华为已拒绝', '华为已接受', '需求总条目'],
+      axisLabel: { fontSize: 12 },
+    },
+    series: [{
+      type: 'bar', barMaxWidth: 18,
+      label: { show: true, position: 'right', fontSize: 12 },
+      data: [
+        { value: s.req_outstanding, itemStyle: { color: '#8c8c8c' } },
+        { value: s.req_tbc, itemStyle: { color: '#fa8c16' } },
+        { value: s.req_rejected, itemStyle: { color: '#f5222d' } },
+        { value: s.req_accepted, itemStyle: { color: '#52c41a' } },
+        { value: s.req_total, itemStyle: { color: '#1677ff' } },
+      ],
+    }],
+  };
+
   return (
     <div>
       <Row gutter={16}>
@@ -96,7 +126,7 @@ export default function Dashboard() {
                 onClick={() => { select(m.id); }}
                 actions={[<RiskTag key="r" risk={m.risk} days={m.days_elapsed} />, <StatusTag key="s" status={m.status} />]}
               >
-                <span style={{ fontFamily: 'monospace', fontSize: 12 }}>{m.module_name}</span>
+                <span style={{ fontSize: 13 }}>{m.module_name}</span>
                 <span style={{ color: '#8c8c8c', fontSize: 12 }}>发送 {m.sent_at} · 截止 {m.deadline_at} · FO {m.fo_name}</span>
               </List.Item>
             )}
@@ -110,10 +140,8 @@ export default function Dashboard() {
         <Col span={8}><Card><ReactECharts option={foOption} style={{ height: 280 }} /></Card></Col>
       </Row>
 
-      <Card size="small" style={{ marginTop: 16 }} extra={<Typography.Link onClick={() => navigate('/list')}>查看全部 →</Typography.Link>}>
-        <Typography.Text type="secondary">
-          需求条目总量 {s.req_total} · 华为已接受 {s.req_accepted} · 数据口径：20241121 Overall requirement list（Meeting 页 67 模块）
-        </Typography.Text>
+      <Card size="small" style={{ marginTop: 16 }}>
+        <ReactECharts option={reqOption} style={{ height: 240 }} />
       </Card>
     </div>
   );
