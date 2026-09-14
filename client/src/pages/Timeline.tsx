@@ -91,7 +91,7 @@ export default function Timeline() {
             <div key={m.id} className={`gantt-row${m.id === selectedId ? ' selected' : ''}`}>
               <Tooltip title={`${m.module_name} · FO ${m.fo_name || '—'} · ${STATUS_LABELS[m.status]}`}>
                 <div className="gantt-name" onClick={() => select(m.id)}>
-                  <span style={{ fontFamily: 'monospace' }}>{m.module_name}</span>
+                  <span style={{ fontSize: 13 }}>{m.module_name}</span>
                   <div style={{ color: '#8c8c8c', fontSize: 11 }}>{m.fo_name || '—'} · {STATUS_LABELS[m.status]}</div>
                 </div>
               </Tooltip>
