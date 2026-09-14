@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const { db } = require('./db');
-const { sign, authRequired, writeRequired, adminRequired } = require('./auth');
+const { sign, authRequired, statusRequired, adminRequired, STATUS_ROLES } = require('./auth');
 const risk = require('./risk');
 
 const app = express();
@@ -34,7 +34,7 @@ app.get('/api/users', authRequired, adminRequired, (req, res) => {
 app.post('/api/users', authRequired, adminRequired, (req, res) => {
   const { username, password, display_name, role, fo_name } = req.body || {};
   if (!username || !password || !display_name) return res.status(400).json({ error: '用户名/密码/姓名必填' });
-  if (!['admin', 'editor', 'viewer'].includes(role)) return res.status(400).json({ error: '角色不合法' });
+  if (!['admin', 'editor', 'supplier', 'viewer'].includes(role)) return res.status(400).json({ error: '角色不合法' });
   try {
     const info = db.prepare(
       'INSERT INTO users (username, password_hash, display_name, role, fo_name) VALUES (?, ?, ?, ?, ?)'
@@ -81,7 +81,8 @@ function pickFields(body) {
   return data;
 }
 
-app.post('/api/modules', authRequired, writeRequired, (req, res) => {
+// 新增模块（含全部字段编辑权）：仅管理员。Cariad / 供应商只能流转状态。
+app.post('/api/modules', authRequired, adminRequired, (req, res) => {
   const data = pickFields(req.body || {});
   if (!data.module_name) return res.status(400).json({ error: 'module_name 必填' });
   if (!risk.STATUSES.includes(data.status || 'draft')) return res.status(400).json({ error: '状态不合法' });
@@ -93,10 +94,19 @@ app.post('/api/modules', authRequired, writeRequired, (req, res) => {
   res.json({ id: info.lastInsertRowid });
 });
 
-app.put('/api/modules/:id', authRequired, writeRequired, (req, res) => {
+// 更新模块：Cariad(editor)/供应商(supplier) 仅可改 status；其他任何字段仅管理员
+app.put('/api/modules/:id', authRequired, (req, res) => {
+  const data = pickFields(req.body || {});
+  const onlyStatus = Object.keys(data).length > 0 && Object.keys(data).every((k) => k === 'status');
+  if (!onlyStatus) {
+    if (req.user.role !== 'admin') {
+      return res.status(403).json({ error: '仅管理员可修改需求内容，你只能变更需求状态' });
+    }
+  } else if (!STATUS_ROLES.includes(req.user.role)) {
+    return res.status(403).json({ error: '无状态流转权限（只读账号）' });
+  }
   const existing = db.prepare('SELECT * FROM modules WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: '模块不存在' });
-  const data = pickFields(req.body || {});
 
   // 状态流转校验
   if (data.status && data.status !== existing.status) {
@@ -130,7 +140,8 @@ app.delete('/api/modules/:id', authRequired, adminRequired, (req, res) => {
 });
 
 // ---------- 交换评论（遵循 [dd/mm/yyyy, 姓名] 格式规范） ----------
-app.post('/api/modules/:id/comments', authRequired, writeRequired, (req, res) => {
+// 交换评论：仅管理员（Cariad/供应商仅可流转状态，不修改需求内容与记录）
+app.post('/api/modules/:id/comments', authRequired, adminRequired, (req, res) => {
   const { side, body } = req.body || {};
   if (!['OEM', 'SUPPLIER'].includes(side)) return res.status(400).json({ error: 'side 必须为 OEM 或 SUPPLIER' });
   if (!body || !body.trim()) return res.status(400).json({ error: '评论内容不能为空' });
@@ -161,6 +172,10 @@ app.get('/api/stats', authRequired, (req, res) => {
     fo_stats: foStats,
     req_total: mods.reduce((s, m) => s + (m.total_reqs || 0), 0),
     req_accepted: mods.reduce((s, m) => s + (m.accepted_reqs || 0), 0),
+    req_rejected: mods.reduce((s, m) => s + (m.rejected_reqs || 0), 0),
+    req_na: mods.reduce((s, m) => s + (m.na_reqs || 0), 0),
+    req_tbc: mods.reduce((s, m) => s + (m.tbc_reqs || 0), 0),
+    req_outstanding: mods.reduce((s, m) => s + (m.outstanding_reqs || 0), 0),
   });
 });
 
