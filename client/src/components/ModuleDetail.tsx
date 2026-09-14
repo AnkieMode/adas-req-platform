@@ -14,7 +14,9 @@ export default function ModuleDetail() {
   const queryClient = useQueryClient();
   const { message } = AntApp.useApp();
   const user = currentUser();
-  const canWrite = user?.role === 'admin' || user?.role === 'editor';
+  // 管理员/同事(Cariad)/华为供应商 可流转状态；交换记录仅管理员
+  const canTransition = !!user && ['admin', 'editor', 'supplier'].includes(user.role);
+  const canComment = user?.role === 'admin';
   const [comment, setComment] = useState('');
   const [side, setSide] = useState<'OEM' | 'SUPPLIER'>('OEM');
 
@@ -53,14 +55,14 @@ export default function ModuleDetail() {
       width={560}
       title={m ? (
         <span>
-          <span style={{ fontFamily: 'monospace', fontSize: 13 }}>{m.module_name}</span>
+          <span style={{ fontSize: 13 }}>{m.module_name}</span>
           <span style={{ marginLeft: 8 }}><HwSwTag hwsw={m.hwsw} /><StatusTag status={m.status} /></span>
         </span>
       ) : '模块详情'}
     >
       {m && (
         <>
-          {canWrite && nextStatuses.length > 0 && (
+          {canTransition && nextStatuses.length > 0 && (
             <div style={{ marginBottom: 16 }}>
               <Divider style={{ margin: '0 0 8px' }} orientation="left" plain>流转到下一状态</Divider>
               {nextStatuses.map((s) => (
@@ -103,7 +105,7 @@ export default function ModuleDetail() {
               ),
             }))}
           />
-          {canWrite && (
+          {canComment && (
             <div style={{ display: 'flex', gap: 8 }}>
               <Select value={side} onChange={setSide} style={{ width: 130 }}
                 options={[{ value: 'OEM', label: 'VWG (OEM)' }, { value: 'SUPPLIER', label: '华为 (Supplier)' }]} />
