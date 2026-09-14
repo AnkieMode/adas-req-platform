@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS users (
   username      TEXT NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
   display_name  TEXT NOT NULL,
-  role          TEXT NOT NULL DEFAULT 'viewer' CHECK (role IN ('admin','editor','viewer')),
+  role          TEXT NOT NULL DEFAULT 'viewer' CHECK (role IN ('admin','editor','supplier','viewer')),
   fo_name       TEXT,
   created_at    TEXT NOT NULL DEFAULT (datetime('now','localtime')),
   updated_at    TEXT NOT NULL DEFAULT (datetime('now','localtime'))
@@ -86,7 +86,32 @@ function ensureAdmin() {
   }
 }
 
+// 迁移：旧库 users 表的 CHECK 约束不含 supplier 角色，需重建表（SQLite 不支持改 CHECK）
+function migrateUsers(d) {
+  const t = d.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='users'").get();
+  if (t && !t.sql.includes("'supplier'")) {
+    d.exec(`
+      ALTER TABLE users RENAME TO users_old;
+      CREATE TABLE users (
+        id            INTEGER PRIMARY KEY AUTOINCREMENT,
+        username      TEXT NOT NULL UNIQUE,
+        password_hash TEXT NOT NULL,
+        display_name  TEXT NOT NULL,
+        role          TEXT NOT NULL DEFAULT 'viewer' CHECK (role IN ('admin','editor','supplier','viewer')),
+        fo_name       TEXT,
+        created_at    TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        updated_at    TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+      );
+      INSERT INTO users (id, username, password_hash, display_name, role, fo_name, created_at, updated_at)
+        SELECT id, username, password_hash, display_name, role, fo_name, created_at, updated_at FROM users_old;
+      DROP TABLE users_old;
+    `);
+    console.log('[migrate] users 表已重建，新增 supplier 角色');
+  }
+}
+
 initSchema(db);
+migrateUsers(db);
 ensureAdmin();
 
 module.exports = { db, dbPath, initSchema };
