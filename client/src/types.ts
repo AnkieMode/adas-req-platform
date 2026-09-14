@@ -44,9 +44,23 @@ export interface UserInfo {
   id: number;
   username: string;
   display_name: string;
-  role: 'admin' | 'editor' | 'viewer';
+  role: 'admin' | 'editor' | 'supplier' | 'viewer';
   fo_name?: string | null;
 }
+
+export const ROLE_LABELS: Record<string, string> = {
+  admin: '管理员',
+  editor: '同事（Cariad）',
+  supplier: '华为供应商',
+  viewer: '只读',
+};
+
+export const ROLE_COLORS: Record<string, string> = {
+  admin: 'gold',
+  editor: 'blue',
+  supplier: 'red',
+  viewer: 'default',
+};
 
 export const STATUS_ORDER: Status[] = [
   'transmitted', 'changed', 'in_review',
