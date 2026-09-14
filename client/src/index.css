@@ -28,7 +28,9 @@ body {
 .gantt-day-label { font-size: 10px; color: #8c8c8c; text-align: center; }
 
 /* 看板 */
-.kanban-scroll { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 12px; align-items: flex-start; }
+.kanban-scroll { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 12px; align-items: flex-start; cursor: grab; }
+.kanban-scroll.panning { cursor: grabbing; user-select: none; }
+.kanban-scroll.panning * { pointer-events: none; }
 .kanban-col { min-width: 230px; width: 230px; flex-shrink: 0; background: #f0f2f5; border-radius: 8px; padding: 8px; }
 .kanban-col.drag-over { outline: 2px dashed #1677ff; }
 .kanban-card { background: #fff; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px;
