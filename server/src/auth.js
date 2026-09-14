@@ -2,7 +2,9 @@
 const jwt = require('jsonwebtoken');
 const { JWT_SECRET, JWT_EXPIRES } = require('./config');
 
-const ROLES = ['admin', 'editor', 'viewer'];
+const ROLES = ['admin', 'editor', 'supplier', 'viewer'];
+// 可流转需求状态的角色：管理员 / 同事(Cariad) / 华为供应商
+const STATUS_ROLES = ['admin', 'editor', 'supplier'];
 
 function sign(user) {
   return jwt.sign(
@@ -32,6 +34,14 @@ function writeRequired(req, res, next) {
   next();
 }
 
+// 状态流转权限：admin / editor(Cariad) / supplier(华为供应商)；viewer 只读
+function statusRequired(req, res, next) {
+  if (!req.user || !STATUS_ROLES.includes(req.user.role)) {
+    return res.status(403).json({ error: '无状态流转权限（只读账号）' });
+  }
+  next();
+}
+
 function adminRequired(req, res, next) {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: '仅管理员可操作' });
@@ -39,4 +49,4 @@ function adminRequired(req, res, next) {
   next();
 }
 
-module.exports = { sign, authRequired, writeRequired, adminRequired, ROLES };
+module.exports = { sign, authRequired, writeRequired, statusRequired, adminRequired, ROLES, STATUS_ROLES };
