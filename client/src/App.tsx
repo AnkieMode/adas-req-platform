@@ -7,6 +7,7 @@ import {
   VerticalRightOutlined, UsergroupAddOutlined, LogoutOutlined, UserOutlined,
 } from '@ant-design/icons';
 import { LinkageProvider } from './store';
+import { ROLE_LABELS } from './types';
 import type { UserInfo } from './types';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -71,7 +72,7 @@ function Shell() {
           >
             <Space style={{ cursor: 'pointer' }}>
               <Avatar size="small" icon={<UserOutlined />} />
-              <span>{user?.display_name}（{user?.role === 'admin' ? '管理员' : user?.role === 'editor' ? '编辑' : '只读'}）</span>
+              <span>{user?.display_name}（{user ? ROLE_LABELS[user.role] || user.role : ''}）</span>
             </Space>
           </Dropdown>
         </Layout.Header>
