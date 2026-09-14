@@ -3,8 +3,7 @@ import { Card, Table, Button, Modal, Form, Input, Select, App as AntApp, Popconf
 import { useQuery, useQueryClient, useMutation } from '@tanstack/react-query';
 import { api, errMsg } from '../api';
 import type { UserInfo } from '../types';
-
-const ROLE_LABELS: Record<string, string> = { admin: '管理员', editor: '编辑', viewer: '只读' };
+import { ROLE_LABELS, ROLE_COLORS } from '../types';
 
 export default function Admin() {
   const queryClient = useQueryClient();
@@ -37,7 +36,7 @@ export default function Admin() {
         columns={[
           { title: '用户名', dataIndex: 'username' },
           { title: '姓名', dataIndex: 'display_name' },
-          { title: '角色', dataIndex: 'role', render: (r: string) => <Tag color={r === 'admin' ? 'gold' : r === 'editor' ? 'blue' : 'default'}>{ROLE_LABELS[r]}</Tag> },
+          { title: '角色', dataIndex: 'role', render: (r: string) => <Tag color={ROLE_COLORS[r] || 'default'}>{ROLE_LABELS[r] || r}</Tag> },
           { title: '创建时间', dataIndex: 'created_at' },
           {
             title: '操作', key: 'op',
@@ -59,9 +58,10 @@ export default function Admin() {
           <Form.Item name="display_name" label="姓名" rules={[{ required: true }]}><Input /></Form.Item>
           <Form.Item name="role" label="角色" rules={[{ required: true }]} initialValue="viewer">
             <Select options={[
-              { value: 'admin', label: '管理员（全部权限）' },
-              { value: 'editor', label: '编辑（可流转状态/评论）' },
-              { value: 'viewer', label: '只读' },
+              { value: 'admin', label: '管理员（全部权限：编辑内容/流转状态/用户管理）' },
+              { value: 'editor', label: '同事（Cariad）：仅可变更需求状态' },
+              { value: 'supplier', label: '华为供应商：仅可变更需求状态（打标）' },
+              { value: 'viewer', label: '只读：仅查看数据与看板' },
             ]} />
           </Form.Item>
         </Form>
