@@ -60,6 +60,10 @@ const tx = db.transaction(() => {
   db.prepare('DELETE FROM users').run();
   db.prepare("INSERT INTO users (username, password_hash, display_name, role) VALUES (?, ?, ?, 'admin')")
     .run('admin', bcrypt.hashSync('adas2026', 10), '安琪（PMO）');
+  db.prepare("INSERT INTO users (username, password_hash, display_name, role) VALUES (?, ?, ?, 'supplier')")
+    .run('huawei01', bcrypt.hashSync('adas2026', 10), '华为供应商（打标）');
+  db.prepare("INSERT INTO users (username, password_hash, display_name, role) VALUES (?, ?, ?, 'editor')")
+    .run('cariad01', bcrypt.hashSync('adas2026', 10), 'Cariad 同事');
   db.prepare("INSERT INTO users (username, password_hash, display_name, role) VALUES (?, ?, ?, 'viewer')")
     .run('pmo01', bcrypt.hashSync('adas2026', 10), 'PMO 同事（只读）');
 });
