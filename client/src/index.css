@@ -28,13 +28,18 @@ body {
 .gantt-day-label { font-size: 10px; color: #8c8c8c; text-align: center; }
 
 /* 看板 */
-.kanban-scroll { display: flex; gap: 12px; overflow-x: auto; padding-bottom: 12px; align-items: flex-start; cursor: grab; }
+.kanban-scroll { display: flex; gap: 12px; overflow-x: auto; padding: 2px 2px 12px; align-items: flex-start; cursor: grab; }
 .kanban-scroll.panning { cursor: grabbing; user-select: none; }
-.kanban-scroll.panning * { pointer-events: none; }
-.kanban-col { min-width: 230px; width: 230px; flex-shrink: 0; background: #f0f2f5; border-radius: 8px; padding: 8px; }
-.kanban-col.drag-over { outline: 2px dashed #1677ff; }
+.kanban-col { min-width: 230px; width: 230px; flex-shrink: 0; background: #f0f2f5; border-radius: 8px; padding: 8px;
+  border: 1px solid transparent; transition: opacity .12s ease, border-color .12s ease; }
+/* 拖拽中：可放置列高亮，不可放置列变暗（无目标时“拖不过去”一眼可见） */
+.kanban-col.target-allowed { border-color: rgba(22,119,255,0.35); background: #e9f1ff; }
+.kanban-col.target-forbidden { opacity: 0.45; }
+.kanban-col.drag-over { outline: 2px dashed #1677ff; outline-offset: -2px; }
 .kanban-card { background: #fff; border-radius: 6px; padding: 10px 12px; margin-bottom: 8px;
-  cursor: grab; border: 1px solid transparent; box-shadow: 0 1px 2px rgba(0,0,0,0.06); }
+  cursor: grab; border: 1px solid transparent; box-shadow: 0 1px 2px rgba(0,0,0,0.06);
+  user-select: none; -webkit-user-select: none; }
+.kanban-card.static { cursor: default; }
 .kanban-card:hover { border-color: #1677ff; }
 .kanban-card.selected { border-color: #1677ff; box-shadow: 0 0 0 2px rgba(22,119,255,0.15); }
 .kanban-card.dragging { opacity: 0.5; }
