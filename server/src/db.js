@@ -42,7 +42,7 @@ CREATE TABLE IF NOT EXISTS modules (
   fo_email        TEXT,
   subdomain       TEXT,
   spdt            TEXT,
-  status          TEXT NOT NULL DEFAULT 'draft' CHECK (status IN ('draft','new','transmitted','in_review','to_be_clarified','rejection_tbc','accepted','cancelled')),
+  status          TEXT NOT NULL DEFAULT 'transmitted' CHECK (status IN ('transmitted','changed','in_review','to_be_clarified','rejection_tbc','accepted','cancelled')),
   supplier_status TEXT CHECK (supplier_status IS NULL OR supplier_status IN ('TO_BE_CLARIFIED','IN_REVIEW','ACCEPTED','REJECTED','N/A')),
   sent_at         TEXT,
   labeled_at      TEXT,
@@ -110,8 +110,62 @@ function migrateUsers(d) {
   }
 }
 
+// 迁移：旧库 modules 表的 CHECK 约束仍是旧状态机（含 draft/new、缺 changed），
+// 拖拽到「已变更」时数据库层会拒绝写入（SQLITE_CONSTRAINT_CHECK）。SQLite 不支持改 CHECK，需重建表。
+function migrateModules(d) {
+  const t = d.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='modules'").get();
+  if (t && !t.sql.includes("'changed'")) {
+    // legacy_alter_table=ON：RENAME 时不改写 exchange_comments 的外键引用，
+    // 否则引用会被改到 modules_old，删除旧表后评论表外键悬空
+    d.pragma('foreign_keys = OFF');
+    d.pragma('legacy_alter_table = ON');
+    d.exec(`
+      ALTER TABLE modules RENAME TO modules_old;
+      CREATE TABLE modules (
+        id              INTEGER PRIMARY KEY AUTOINCREMENT,
+        seq             INTEGER,
+        module_name     TEXT NOT NULL UNIQUE,
+        hwsw            TEXT NOT NULL DEFAULT 'SW' CHECK (hwsw IN ('HW','SW')),
+        fo_name         TEXT,
+        fo_email        TEXT,
+        subdomain       TEXT,
+        spdt            TEXT,
+        status          TEXT NOT NULL DEFAULT 'transmitted' CHECK (status IN ('transmitted','changed','in_review','to_be_clarified','rejection_tbc','accepted','cancelled')),
+        supplier_status TEXT CHECK (supplier_status IS NULL OR supplier_status IN ('TO_BE_CLARIFIED','IN_REVIEW','ACCEPTED','REJECTED','N/A')),
+        sent_at         TEXT,
+        labeled_at      TEXT,
+        locked_at       TEXT,
+        total_reqs      INTEGER DEFAULT 0,
+        accepted_reqs   INTEGER DEFAULT 0,
+        rejected_reqs   INTEGER DEFAULT 0,
+        na_reqs         INTEGER DEFAULT 0,
+        tbc_reqs        INTEGER DEFAULT 0,
+        outstanding_reqs INTEGER DEFAULT 0,
+        remark          TEXT,
+        created_at      TEXT NOT NULL DEFAULT (datetime('now','localtime')),
+        updated_at      TEXT NOT NULL DEFAULT (datetime('now','localtime'))
+      );
+      INSERT INTO modules SELECT
+        id, seq, module_name, hwsw, fo_name, fo_email, subdomain, spdt,
+        CASE WHEN status IN ('draft','new') THEN 'transmitted' ELSE status END,
+        supplier_status, sent_at, labeled_at, locked_at,
+        total_reqs, accepted_reqs, rejected_reqs, na_reqs, tbc_reqs, outstanding_reqs,
+        remark, created_at, updated_at
+      FROM modules_old;
+      DROP TABLE modules_old;
+      CREATE INDEX IF NOT EXISTS idx_modules_status ON modules(status);
+      CREATE INDEX IF NOT EXISTS idx_modules_fo ON modules(fo_name);
+      CREATE INDEX IF NOT EXISTS idx_modules_hwsw ON modules(hwsw);
+    `);
+    d.pragma('legacy_alter_table = OFF');
+    d.pragma('foreign_keys = ON');
+    console.log('[migrate] modules 表已重建，状态机更新（移除 draft/new，新增 changed）');
+  }
+}
+
 initSchema(db);
 migrateUsers(db);
+migrateModules(db);
 ensureAdmin();
 
 module.exports = { db, dbPath, initSchema };
