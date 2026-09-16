@@ -2,6 +2,7 @@
 const Database = require('better-sqlite3');
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { DATA_DIR } = require('./config');
 
@@ -78,11 +79,16 @@ CREATE INDEX IF NOT EXISTS idx_comments_module ON exchange_comments(module_id);
 function ensureAdmin() {
   const count = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
   if (count === 0) {
-    const hash = bcrypt.hashSync(process.env.ADMIN_PASSWORD || 'adas2026', 10);
+    // 初始管理员口令：只认环境变量 ADMIN_PASSWORD，代码内不留默认口令；
+    // 未设置则随机生成并仅打印一次，请立即保存并在首次登录后修改。
+    const generated = !process.env.ADMIN_PASSWORD;
+    const pwd = process.env.ADMIN_PASSWORD || crypto.randomBytes(9).toString('base64url');
+    const hash = bcrypt.hashSync(pwd, 10);
     db.prepare(
       "INSERT INTO users (username, password_hash, display_name, role) VALUES (?, ?, ?, 'admin')"
     ).run('admin', hash, '管理员');
     console.log('[init] 默认管理员已创建: admin');
+    if (generated) console.log(`[init] 本次随机初始口令（仅显示一次）: ${pwd}`);
   }
 }
 

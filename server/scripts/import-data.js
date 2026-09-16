@@ -5,6 +5,7 @@
 // 用法: npm run import   （重复执行会清空 modules 表后重灌）
 const fs = require('fs');
 const path = require('path');
+const crypto = require('crypto');
 const bcrypt = require('bcryptjs');
 const { db, dbPath } = require('../src/db');
 const { fmtLocal } = require('../src/risk');
@@ -12,6 +13,10 @@ const { fmtLocal } = require('../src/risk');
 const seedPath = path.join(__dirname, 'seed-data.json');
 const rows = JSON.parse(fs.readFileSync(seedPath, 'utf-8'));
 if (rows.length !== 67) throw new Error(`seed 数据异常: ${rows.length} != 67`);
+
+// 初始口令：优先环境变量 SEED_PASSWORD；未提供则随机生成，仅在本次控制台输出一次，仓库内不留明文
+const seedPassword = process.env.SEED_PASSWORD || crypto.randomBytes(9).toString('base64url');
+const generated = !process.env.SEED_PASSWORD;
 
 // 统一走 risk.fmtLocal：本地时区日期，不能用 toISOString（UTC 会让 08:00 前的导入整体差一天）
 function dstr(offsetDays) {
@@ -60,19 +65,26 @@ const tx = db.transaction(() => {
       remark: null,
     });
   }
-  // 示例账号
+  // 示例账号：初始口令不落仓库。优先取环境变量 SEED_PASSWORD，未提供则本次随机生成
+  const hash = bcrypt.hashSync(seedPassword, 10);
   db.prepare('DELETE FROM users').run();
-  db.prepare("INSERT INTO users (username, password_hash, display_name, role) VALUES (?, ?, ?, 'admin')")
-    .run('admin', bcrypt.hashSync('adas2026', 10), '安琪（PMO）');
-  db.prepare("INSERT INTO users (username, password_hash, display_name, role) VALUES (?, ?, ?, 'supplier')")
-    .run('huawei01', bcrypt.hashSync('adas2026', 10), '华为供应商（打标）');
-  db.prepare("INSERT INTO users (username, password_hash, display_name, role) VALUES (?, ?, ?, 'editor')")
-    .run('cariad01', bcrypt.hashSync('adas2026', 10), 'Cariad 同事');
-  db.prepare("INSERT INTO users (username, password_hash, display_name, role) VALUES (?, ?, ?, 'viewer')")
-    .run('pmo01', bcrypt.hashSync('adas2026', 10), 'PMO 同事（只读）');
+  const insertUser = db.prepare('INSERT INTO users (username, password_hash, display_name, role) VALUES (?, ?, ?, ?)');
+  insertUser.run('admin', hash, '安琪（PMO）', 'admin');
+  insertUser.run('huawei01', hash, '华为供应商（打标）', 'supplier');
+  insertUser.run('cariad01', hash, 'Cariad 同事', 'editor');
+  insertUser.run('pmo01', hash, 'PMO 同事（只读）', 'viewer');
 });
 tx();
 
 const counts = db.prepare('SELECT status, COUNT(*) n FROM modules GROUP BY status').all();
 console.log(`导入完成 -> ${dbPath}`);
 console.table(counts);
+
+const accounts = db.prepare('SELECT username, role, display_name FROM users ORDER BY id').all();
+console.table(accounts);
+if (generated) {
+  console.log('\n本次初始口令（随机生成，仅显示这一次，请立即保存并在首次登录后修改）:');
+  console.log(`  ${seedPassword}\n`);
+} else {
+  console.log('\n初始口令取自环境变量 SEED_PASSWORD（未在此输出）。\n');
+}

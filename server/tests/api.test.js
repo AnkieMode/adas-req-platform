@@ -11,6 +11,8 @@ const path = require('node:path');
 const PORT = 3099;
 const BASE = `http://127.0.0.1:${PORT}`;
 const DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'adas-api-test-'));
+// 仅用于测试进程的临时口令（注入 ADMIN_PASSWORD 覆盖），与任何真实环境口令无关
+const TEST_PASSWORD = 'unit-test-only-pass';
 let child = null;
 
 async function waitForHealth() {
@@ -46,12 +48,12 @@ async function login(username, password) {
 
 test('API 冒烟：需求模块全链路', async (t) => {
   child = spawn(process.execPath, [path.join(__dirname, '..', 'src', 'index.js')], {
-    env: { ...process.env, PORT: String(PORT), DATA_DIR, JWT_SECRET: 'api-test-secret', ADMIN_PASSWORD: 'adas2026' },
+    env: { ...process.env, PORT: String(PORT), DATA_DIR, JWT_SECRET: 'api-test-secret', ADMIN_PASSWORD: TEST_PASSWORD },
     stdio: 'ignore',
   });
   try {
     await waitForHealth();
-    const admin = () => login('admin', 'adas2026');
+    const admin = () => login('admin', TEST_PASSWORD);
 
     await t.test('未登录访问接口返回 401', async () => {
       const r = await api('GET', '/api/modules');
@@ -115,10 +117,10 @@ test('API 冒烟：需求模块全链路', async (t) => {
     const mkUser = async (username, role) => {
       const r = await api('POST', '/api/users', {
         token: adminToken,
-        body: { username, password: 'adas2026', display_name: username, role },
+        body: { username, password: TEST_PASSWORD, display_name: username, role },
       });
       assert.equal(r.status, 200, JSON.stringify(r.data));
-      return login(username, 'adas2026');
+      return login(username, TEST_PASSWORD);
     };
 
     const supplierToken = await mkUser('sup_test', 'supplier');

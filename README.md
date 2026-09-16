@@ -33,7 +33,9 @@ cd server && npm install && npm run import && npm run dev   # http://localhost:3
 cd client && npm install && npm run dev                     # http://localhost:5174
 ```
 
-默认账号（密码均为 `adas2026`）：`admin`（管理员）、`cariad01`（同事）、`huawei01`（华为供应商）、`pmo01`（只读）。
+演示账号：`admin`（管理员）、`cariad01`（同事）、`huawei01`（华为供应商）、`pmo01`（只读）。
+
+初始口令**不在本仓库中留存**：导入时读取环境变量 `SEED_PASSWORD`，未设置则随机生成并只在控制台打印一次；服务首次启动创建管理员时同理读取 `ADMIN_PASSWORD`。请自行保存并在首次登录后立即修改。
 
 `npm run import` 会从 `server/scripts/seed-data.json`（源自 `20241121_Overall requirement list.xlsx` Meeting 页 67 个模块）导入数据，日期按导入日"复活"：50 个已锁定分布在近 100 天，17 个流转中分布在近 2 周（含 2 红 2 黄演示案例）。
 
