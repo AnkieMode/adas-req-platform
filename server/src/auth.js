@@ -27,20 +27,9 @@ function authRequired(req, res, next) {
 }
 
 // 写权限：admin / editor；viewer 只读
-function writeRequired(req, res, next) {
-  if (!req.user || !['admin', 'editor'].includes(req.user.role)) {
-    return res.status(403).json({ error: '无写权限（只读账号）' });
-  }
-  next();
-}
-
 // 状态流转权限：admin / editor(Cariad) / supplier(华为供应商)；viewer 只读
-function statusRequired(req, res, next) {
-  if (!req.user || !STATUS_ROLES.includes(req.user.role)) {
-    return res.status(403).json({ error: '无状态流转权限（只读账号）' });
-  }
-  next();
-}
+// 说明：具体接口的权限在 src/index.js 内联判定（按“是否只改 status 字段”区分），
+// 这里只保留登录态校验与管理员校验，避免出现与实际授权逻辑不一致的死中间件。
 
 function adminRequired(req, res, next) {
   if (!req.user || req.user.role !== 'admin') {
@@ -49,4 +38,4 @@ function adminRequired(req, res, next) {
   next();
 }
 
-module.exports = { sign, authRequired, writeRequired, statusRequired, adminRequired, ROLES, STATUS_ROLES };
+module.exports = { sign, authRequired, adminRequired, ROLES, STATUS_ROLES };

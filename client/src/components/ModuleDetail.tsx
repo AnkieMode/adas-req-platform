@@ -14,11 +14,14 @@ export default function ModuleDetail() {
   const queryClient = useQueryClient();
   const { message } = AntApp.useApp();
   const user = currentUser();
-  // 管理员/同事(Cariad)/华为供应商 可流转状态；交换记录仅管理员
+  // 管理员/同事(Cariad)/华为供应商 可流转状态
+  // 交换记录：管理员（可代记任一侧）+ 华为供应商（固定记 SUPPLIER 侧）
   const canTransition = !!user && ['admin', 'editor', 'supplier'].includes(user.role);
-  const canComment = user?.role === 'admin';
+  const canComment = !!user && ['admin', 'supplier'].includes(user.role);
+  const supplierOnly = user?.role === 'supplier';
   const [comment, setComment] = useState('');
   const [side, setSide] = useState<'OEM' | 'SUPPLIER'>('OEM');
+  const commentSide: 'OEM' | 'SUPPLIER' = supplierOnly ? 'SUPPLIER' : side;
 
   const { data } = useQuery({
     queryKey: ['module', selectedId],
@@ -39,7 +42,7 @@ export default function ModuleDetail() {
   });
 
   const commentMutation = useMutation({
-    mutationFn: () => api.post(`/modules/${selectedId}/comments`, { side, body: comment }),
+    mutationFn: () => api.post(`/modules/${selectedId}/comments`, { side: commentSide, body: comment }),
     onSuccess: () => { message.success('评论已添加'); setComment(''); invalidate(); },
     onError: (e) => message.error(errMsg(e)),
   });
@@ -107,7 +110,7 @@ export default function ModuleDetail() {
           />
           {canComment && (
             <div style={{ display: 'flex', gap: 8 }}>
-              <Select value={side} onChange={setSide} style={{ width: 130 }}
+              <Select value={commentSide} onChange={setSide} style={{ width: 130 }} disabled={supplierOnly}
                 options={[{ value: 'OEM', label: 'VWG (OEM)' }, { value: 'SUPPLIER', label: '华为 (Supplier)' }]} />
               <Input value={comment} onChange={(e) => setComment(e.target.value)}
                 placeholder="交换评论（自动附加日期与姓名）" onPressEnter={() => comment.trim() && commentMutation.mutate()} />

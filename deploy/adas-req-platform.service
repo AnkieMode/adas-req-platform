@@ -1,0 +1,24 @@
+# ADAS 需求管理平台 systemd 服务单元（生产环境实际使用的方式）
+# 安装：
+#   sudo cp deploy/adas-req-platform.service /etc/systemd/system/
+#   sudo systemctl daemon-reload && sudo systemctl enable --now adas-req-platform
+# 注意：JWT_SECRET 必须替换为真实随机值（64 位十六进制，例如 openssl rand -hex 32），
+#       不要沿用仓库里的占位符；ADMIN_PASSWORD 仅首次初始化管理员账号时生效。
+[Unit]
+Description=ADAS Requirement Management Platform
+After=network.target
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/home/ubuntu/adas-req-platform/server
+ExecStart=/usr/bin/node src/index.js
+Restart=always
+RestartSec=5
+Environment=PORT=3002
+Environment=DATA_DIR=/home/ubuntu/adas-req-platform/data
+Environment=NODE_ENV=production
+Environment=JWT_SECRET=__REPLACE_WITH_OPENSSL_RAND_HEX_32__
+
+[Install]
+WantedBy=multi-user.target

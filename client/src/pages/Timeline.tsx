@@ -20,14 +20,21 @@ export default function Timeline() {
   });
   const modules = data || [];
 
-  // 时间范围：最早发送日 -2 天 ~ 今天 +10 天
+  // 时间范围：流转中视图看近 16 天；「全部模块」视图从最早发送日起（最多回溯 120 天）
+  // 注：不要用 dayjs.min()——它属于 minMax 插件，未 dayjs.extend 时运行时会直接抛错
   const { start, days } = useMemo(() => {
     const today = dayjs();
-    const sentDates = modules.filter((m) => m.sent_at).map((m) => dayjs(m.sent_at));
-    const min = showAll && sentDates.length
-      ? dayjs.min([today.subtract(2, 'day'), ...sentDates.map((d) => (d.isBefore(today.subtract(120, 'day')) ? d : d))])
-      : today.subtract(16, 'day');
-    const s = min.startOf('day');
+    const earliestSent = modules.reduce<string | null>(
+      (acc, m) => (m.sent_at && (!acc || m.sent_at < acc) ? m.sent_at : acc),
+      null,
+    );
+    const floor = today.subtract(120, 'day');
+    let from = today.subtract(16, 'day');
+    if (showAll && earliestSent) {
+      const earliest = dayjs(earliestSent);
+      from = earliest.isAfter(floor) ? earliest : floor;
+    }
+    const s = from.startOf('day');
     return { start: s, days: today.add(10, 'day').diff(s, 'day') + 1 };
   }, [modules, showAll]);
 

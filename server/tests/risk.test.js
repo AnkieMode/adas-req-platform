@@ -1,6 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert');
-const { riskLevel, deadlineOf, canTransition, decorate } = require('../src/risk');
+const { riskLevel, deadlineOf, canTransition, decorate, fmtLocal, todayLocal, STATUSES } = require('../src/risk');
 
 function daysAgo(n) {
   const d = new Date();
@@ -50,4 +50,27 @@ test('decorate 输出 deadline 与风险', () => {
   assert.equal(d.risk, 'yellow');
   assert.equal(d.days_elapsed, 5);
   assert.ok(d.deadline_at);
+});
+
+test('decorate 对非法发送日不输出 NaN', () => {
+  const d = decorate({ status: 'transmitted', sent_at: 'not-a-date' });
+  assert.equal(d.days_elapsed, null);
+  assert.equal(d.risk, 'none');
+  assert.equal(d.deadline_at, null);
+});
+
+test('日期一律按本地时区（不受 UTC 偏移影响）', () => {
+  // 本地时间 07:00 / 00:05 这类时刻，用 toISOString().slice(0,10) 在 UTC+8 会算成前一天，
+  // fmtLocal 必须始终等于本地日历日期
+  assert.equal(fmtLocal(new Date(2026, 8, 15, 12, 0)), '2026-09-15');
+  assert.equal(fmtLocal(new Date(2026, 8, 15, 7, 0)), '2026-09-15');
+  assert.equal(fmtLocal(new Date(2026, 0, 1, 0, 5)), '2026-01-01');
+  assert.match(todayLocal(), /^\d{4}-\d{2}-\d{2}$/);
+});
+
+test('状态机不含已废弃的 draft / new', () => {
+  assert.ok(!STATUSES.includes('draft'));
+  assert.ok(!STATUSES.includes('new'));
+  assert.ok(STATUSES.includes('changed'));
+  assert.equal(STATUSES[0], 'transmitted'); // 新增模块的默认状态
 });

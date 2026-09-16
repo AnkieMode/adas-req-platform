@@ -61,9 +61,15 @@ function riskLevel(mod, now = new Date()) {
   return 'green';
 }
 
-// 打标截止日 = 发送日 + 7 天（本地时区日期，避免 toISOString 时区偏移）
+// 日期一律按本地时区格式化。
+// 不用 toISOString().slice(0,10)：它取的是 UTC 日期，北京时间 08:00 前会算成前一天，
+// 导致 7 日打标计时整体偏差 1 天（状态流转、数据导入都依赖这里）。
 function fmtLocal(d) {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function todayLocal(now = new Date()) {
+  return fmtLocal(now);
 }
 function deadlineOf(sentAt) {
   if (!sentAt) return null;
@@ -74,13 +80,19 @@ function deadlineOf(sentAt) {
 }
 
 function decorate(mod, now = new Date()) {
+  // sent_at 异常（非法日期）时不该输出 NaN，统一回落为 null
+  let daysElapsed = null;
+  if (mod.sent_at) {
+    const sent = new Date(mod.sent_at + 'T00:00:00');
+    if (!Number.isNaN(sent.getTime())) {
+      daysElapsed = Math.max(0, Math.floor((startOfDay(now) - startOfDay(sent)) / 86400000));
+    }
+  }
   return {
     ...mod,
     deadline_at: deadlineOf(mod.sent_at),
     risk: riskLevel(mod, now),
-    days_elapsed: mod.sent_at
-      ? Math.max(0, Math.floor((startOfDay(now) - startOfDay(new Date(mod.sent_at + 'T00:00:00'))) / 86400000))
-      : null,
+    days_elapsed: daysElapsed,
   };
 }
 
@@ -98,4 +110,5 @@ module.exports = {
   SUPPLIER_STATUS, SUPPLIER_LABELS,
   RISK_LABELS, RISK_COLORS,
   riskLevel, deadlineOf, decorate, canTransition,
+  fmtLocal, todayLocal,
 };

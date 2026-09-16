@@ -211,7 +211,6 @@ export default function Kanban() {
       }}
       onDragCancel={resetDrag}
       onDragEnd={({ active, over }) => {
-        const from = dragFrom;
         resetDrag();
         if (!over) {
           message.warning('没有放到任何状态列上，已取消（可按住空白处左右拖动查看更多列）');

@@ -35,6 +35,9 @@ jobs:
       - name: Install deps
         working-directory: client
         run: npm ci
-      - name: Type-check & build
+      - name: Type-check
+        working-directory: client
+        run: npm run typecheck
+      - name: Build
         working-directory: client
         run: npm run build

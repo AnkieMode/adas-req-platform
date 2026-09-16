@@ -3,7 +3,7 @@ const path = require('path');
 const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const { db } = require('./db');
-const { sign, authRequired, statusRequired, adminRequired, STATUS_ROLES } = require('./auth');
+const { sign, authRequired, adminRequired, STATUS_ROLES } = require('./auth');
 const risk = require('./risk');
 
 const app = express();
@@ -85,8 +85,9 @@ function pickFields(body) {
 app.post('/api/modules', authRequired, adminRequired, (req, res) => {
   const data = pickFields(req.body || {});
   if (!data.module_name) return res.status(400).json({ error: 'module_name 必填' });
-  if (!risk.STATUSES.includes(data.status || 'draft')) return res.status(400).json({ error: '状态不合法' });
-  data.status = data.status || 'draft';
+  // 默认「已发送华为」：draft/new 已从状态机移除，不能再作默认值（会撞 DB CHECK 约束）
+  data.status = data.status || 'transmitted';
+  if (!risk.STATUSES.includes(data.status)) return res.status(400).json({ error: '状态不合法' });
   const cols = Object.keys(data);
   const info = db.prepare(
     `INSERT INTO modules (${cols.join(',')}) VALUES (${cols.map(() => '?').join(',')})`
@@ -115,8 +116,8 @@ app.put('/api/modules/:id', authRequired, (req, res) => {
         error: `不允许的状态流转: ${risk.STATUS_LABELS[existing.status]} -> ${risk.STATUS_LABELS[data.status]}`,
       });
     }
-    // 联动日期字段
-    const now = new Date().toISOString().slice(0, 10);
+    // 联动日期字段（本地日期，避免 UTC 导致的跨日偏差）
+    const now = risk.todayLocal();
     if (data.status === 'transmitted' && !data.sent_at && !existing.sent_at) data.sent_at = now;
     if (['in_review', 'to_be_clarified', 'rejection_tbc', 'accepted'].includes(data.status) && !existing.labeled_at && !data.labeled_at) {
       data.labeled_at = now;
@@ -140,14 +141,21 @@ app.delete('/api/modules/:id', authRequired, adminRequired, (req, res) => {
 });
 
 // ---------- 交换评论（遵循 [dd/mm/yyyy, 姓名] 格式规范） ----------
-// 交换评论：仅管理员（Cariad/供应商仅可流转状态，不修改需求内容与记录）
-app.post('/api/modules/:id/comments', authRequired, adminRequired, (req, res) => {
-  const { side, body } = req.body || {};
+// 交换记录是双侧的：管理员可代记 OEM/华为任一侧，华为供应商账号只能记自己（SUPPLIER）一侧。
+// Cariad 同事与只读账号不可写记录（仅可流转状态）。
+const COMMENT_ROLES = ['admin', 'supplier'];
+app.post('/api/modules/:id/comments', authRequired, (req, res) => {
+  if (!COMMENT_ROLES.includes(req.user.role)) {
+    return res.status(403).json({ error: '无交换记录权限（仅管理员与华为供应商可留言）' });
+  }
+  const body = (req.body || {}).body;
+  // 供应商强制记为 SUPPLIER 侧，避免冒用 OEM 口径
+  const side = req.user.role === 'supplier' ? 'SUPPLIER' : (req.body || {}).side;
   if (!['OEM', 'SUPPLIER'].includes(side)) return res.status(400).json({ error: 'side 必须为 OEM 或 SUPPLIER' });
   if (!body || !body.trim()) return res.status(400).json({ error: '评论内容不能为空' });
   const m = db.prepare('SELECT id FROM modules WHERE id = ?').get(req.params.id);
   if (!m) return res.status(404).json({ error: '模块不存在' });
-  const author = `${req.user.display_name}`;
+  const author = req.user.display_name;
   const d = new Date();
   const prefix = `[${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${d.getFullYear()}, ${author}] `;
   const info = db.prepare(
