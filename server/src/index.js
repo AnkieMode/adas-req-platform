@@ -4,19 +4,36 @@ const fs = require('fs');
 const bcrypt = require('bcryptjs');
 const { db } = require('./db');
 const { sign, authRequired, adminRequired, STATUS_ROLES } = require('./auth');
+const { createAttemptLimiter } = require('./ratelimit');
+const { LOGIN_MAX_ATTEMPTS, LOGIN_WINDOW_MS } = require('./config');
 const risk = require('./risk');
 
 const app = express();
 app.use(express.json());
 
+// 登录失败限流：挡暴力猜口令（公网实例 + 公开仓库，必须有）
+const loginLimiter = createAttemptLimiter({ maxAttempts: LOGIN_MAX_ATTEMPTS, windowMs: LOGIN_WINDOW_MS });
+
 // ---------- 认证 ----------
 app.post('/api/auth/login', (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) return res.status(400).json({ error: '请输入用户名和密码' });
+
+  const limiterKey = `${req.ip}|${String(username).toLowerCase()}`;
+  const gate = loginLimiter.blocked(limiterKey);
+  if (gate.blocked) {
+    return res
+      .status(429)
+      .set('Retry-After', String(gate.retryAfterSec))
+      .json({ error: `登录尝试过于频繁，请 ${Math.ceil(gate.retryAfterSec / 60)} 分钟后再试` });
+  }
+
   const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
+    loginLimiter.fail(limiterKey);
     return res.status(401).json({ error: '用户名或密码错误' });
   }
+  loginLimiter.reset(limiterKey);
   res.json({ token: sign(user), user: { id: user.id, username: user.username, display_name: user.display_name, role: user.role, fo_name: user.fo_name } });
 });
 

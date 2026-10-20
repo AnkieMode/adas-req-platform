@@ -74,6 +74,32 @@ curl -s http://<host>:3002/api/health
 
 > `Dockerfile` 与 `deploy/docker-compose.yml` 为可选的容器化部署方式（未在生产启用），生产环境以 systemd 为准。
 
+## 运维
+
+**环境变量**
+
+| 变量 | 默认 | 说明 |
+| --- | --- | --- |
+| `DATA_DIR` | `server/data` | SQLite 目录（生产指向 `/home/ubuntu/adas-req-platform/data`） |
+| `PORT` | `3002` | 监听端口 |
+| `JWT_SECRET` | 无 | **生产必填**，缺失时服务拒绝启动；开发环境缺失则生成进程内临时密钥 |
+| `LOGIN_MAX_ATTEMPTS` | `10` | 登录失败限流：窗口内同 IP + 同用户名允许的失败次数 |
+| `LOGIN_WINDOW_MS` | `600000` | 限流窗口（默认 10 分钟） |
+| `SEED_PASSWORD` | 无 | `npm run import` 的初始口令，未设置则随机生成并打印一次 |
+| `FORCE_USERS` | 无 | 设为 `1` 时导入会**重建**全部账号（默认非空库跳过，保住现有口令） |
+
+**自动备份**
+
+```bash
+# 手动执行一次（一致性快照，默认保留最近 14 份）
+DATA_DIR=/home/ubuntu/adas-req-platform/data node scripts/backup-db.js
+
+# 服务器 crontab：每天 03:30
+30 3 * * * cd /home/ubuntu/adas-req-platform/server && DATA_DIR=/home/ubuntu/adas-req-platform/data node scripts/backup-db.js >> /home/ubuntu/adas-req-platform/data/backups/backup.log 2>&1
+```
+
+备份文件形如 `data/backups/adas-req-YYYYMMDD-HHMMSSmmm.db`。恢复：停服务 → 用备份覆盖 `adas-req.db`（同时删除 `-wal` / `-shm`）→ 启动。
+
 ## 数据隔离说明
 
 本项目使用独立 SQLite 数据库文件 `adas-req.db`（`DATA_DIR` 环境变量控制，默认 `server/data`，生产环境 `/home/ubuntu/adas-req-platform/data`），与 xhs-platform 的 `app.db` 无任何交集。

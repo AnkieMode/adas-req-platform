@@ -166,6 +166,18 @@ test('API 冒烟：需求模块全链路', async (t) => {
       assert.equal(r.status, 200);
       assert.ok(r.data.total >= 2);
     });
+
+    await t.test('登录失败超过上限返回 429（防暴力猜口令）', async () => {
+      // 默认上限 10 次/10 分钟；用不存在的用户名避免触发 bcrypt，最后第 11 次应被限流
+      let last;
+      for (let i = 0; i < 11; i += 1) {
+        last = await api('POST', '/api/auth/login', { body: { username: 'nobody_brute', password: 'wrong' } });
+      }
+      assert.equal(last.status, 429, JSON.stringify(last.data));
+      // 其他用户名不受影响
+      const other = await api('POST', '/api/auth/login', { body: { username: 'admin', password: TEST_PASSWORD } });
+      assert.equal(other.status, 200);
+    });
   } finally {
     if (child) child.kill();
     try { fs.rmSync(DATA_DIR, { recursive: true, force: true }); } catch (_) { /* Windows 句柄未释放时忽略 */ }
