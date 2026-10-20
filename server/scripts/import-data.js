@@ -1,8 +1,10 @@
 // 数据导入脚本：从 seed-data.json（源自 20241121_Overall requirement list.xlsx Meeting 页）
 // 导入 67 个需求模块。日期全部按导入日"复活"：
-//   - 已锁定(50): locked_at 分布在近 100 天内，sent_at = locked_at - (10+i%20) 天
-//   - 流转中(17): 按预置偏移分布近 2 周，含 2 红(逾期)/2 黄(临期)/3 绿演示案例
+//   - 已锁定(50): locked_at 铺在最近 28 天内（近一个月），sent_at = locked_at - (3~11) 天
+//   - 流转中(17): 全部压在最近一周内（1~9 天），含 2 红(逾期)/2 黄(临期)/1 绿演示案例
 // 用法: npm run import   （重复执行会清空 modules 表后重灌）
+// 账号：默认**不重建**（users 表非空时跳过），避免刷新数据时把线上口令洗掉；
+//       需要重置账号时设 FORCE_USERS=1。
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
@@ -32,7 +34,8 @@ VALUES (@seq, @module_name, @hwsw, @fo_name, @fo_email, @subdomain, @spdt, @stat
   @sent_at, @labeled_at, @locked_at, @total_reqs, @accepted_reqs, @rejected_reqs, @na_reqs, @tbc_reqs, @outstanding_reqs, @remark)
 `);
 
-// 流转中模块的演示日期：module_name -> { offset(发送日距今), labeled(+N 天打标) }
+// 流转中模块的演示日期：module_name -> { offset(发送日距今天数) }
+// 只给 5 个 transmitted 模块指定（它们是唯一参与 7 日打标计时的），其余按序号铺在 1~7 天内
 const flowDates = {
   '00_CAA_Law_Regulation_Standard': { offset: 9 },                 // 红：逾期 2 天
   '00_CAA_PPC_Module_Requirements': { offset: 8 },                 // 红：逾期 1 天（澄清后二轮发送）
@@ -41,18 +44,26 @@ const flowDates = {
   '01_CAA_LIDAR_85D_907_Basismodul': { offset: 2 },                // 绿
 };
 
+let createdUsers = false;
 const tx = db.transaction(() => {
   db.prepare('DELETE FROM exchange_comments').run();
   db.prepare('DELETE FROM modules').run();
   let lockedIdx = 0;
+  let flowIdx = 0;
   for (const r of rows) {
-    const flowOffset = flowDates[r.module_name]?.offset ?? 14;
-    // 已锁定模块的发送日铺开在近 100 天内；流转中模块按预置偏移（含 2 红 / 2 黄演示案例）
-    const sent_at = dstr(r.status === 'accepted' ? 20 + (lockedIdx % 20) + Math.floor(lockedIdx / 20) * 12 : flowOffset);
-    const labeled_at = r.labeled_at !== undefined && r.labeled_at !== null
-      ? dstr(flowOffset - r.labeled_at)
-      : (['in_review', 'to_be_clarified', 'rejection_tbc', 'accepted'].includes(r.status) ? dstr(flowOffset - 2) : null);
-    const locked_at = r.status === 'accepted' ? dstr(10 + (lockedIdx++ % 90)) : null;
+    const flowOffset = flowDates[r.module_name]?.offset ?? (1 + (flowIdx++ % 7));
+    // 已锁定：锁定日落最近 28 天，发送日在其前 3~11 天；流转中：最近一周内
+    const lockedBack = r.status === 'accepted' ? 1 + (lockedIdx % 28) : 0;
+    const sentBack = r.status === 'accepted' ? lockedBack + 3 + (lockedIdx % 9) : flowOffset;
+    const sent_at = dstr(sentBack);
+    const labeled_at = r.status === 'accepted'
+      ? dstr(lockedBack + Math.max(1, Math.floor((3 + (lockedIdx % 9)) / 2)))
+      : (r.labeled_at !== undefined && r.labeled_at !== null
+        ? dstr(Math.max(0, flowOffset - r.labeled_at))
+        : (['in_review', 'to_be_clarified', 'rejection_tbc'].includes(r.status)
+          ? dstr(Math.max(0, flowOffset - 2)) : null));
+    const locked_at = r.status === 'accepted' ? dstr(lockedBack) : null;
+    if (r.status === 'accepted') lockedIdx++;
     ins.run({
       seq: r.seq, module_name: r.module_name, hwsw: r.hwsw,
       fo_name: r.fo_name, fo_email: r.fo_email,
@@ -65,7 +76,12 @@ const tx = db.transaction(() => {
       remark: null,
     });
   }
-  // 示例账号：初始口令不落仓库。优先取环境变量 SEED_PASSWORD，未提供则本次随机生成
+  // 示例账号：默认只在空库时创建，避免刷新数据把已改过的口令洗掉（FORCE_USERS=1 才重建）
+  const existing = db.prepare('SELECT COUNT(*) AS n FROM users').get().n;
+  if (existing > 0 && process.env.FORCE_USERS !== '1') {
+    console.log(`[users] 已存在 ${existing} 个账号，本次不重建（保持现有口令）；需重置请设 FORCE_USERS=1`);
+    return;
+  }
   const hash = bcrypt.hashSync(seedPassword, 10);
   db.prepare('DELETE FROM users').run();
   const insertUser = db.prepare('INSERT INTO users (username, password_hash, display_name, role) VALUES (?, ?, ?, ?)');
@@ -73,6 +89,7 @@ const tx = db.transaction(() => {
   insertUser.run('huawei01', hash, '华为供应商（打标）', 'supplier');
   insertUser.run('cariad01', hash, 'Cariad 同事', 'editor');
   insertUser.run('pmo01', hash, 'PMO 同事（只读）', 'viewer');
+  createdUsers = true;
 });
 tx();
 
@@ -82,7 +99,9 @@ console.table(counts);
 
 const accounts = db.prepare('SELECT username, role, display_name FROM users ORDER BY id').all();
 console.table(accounts);
-if (generated) {
+if (!createdUsers) {
+  console.log('\n账号未改动，口令保持原状。\n');
+} else if (generated) {
   console.log('\n本次初始口令（随机生成，仅显示这一次，请立即保存并在首次登录后修改）:');
   console.log(`  ${seedPassword}\n`);
 } else {

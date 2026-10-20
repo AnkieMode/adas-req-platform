@@ -29,7 +29,8 @@ export default function Timeline() {
       null,
     );
     const floor = today.subtract(120, 'day');
-    let from = today.subtract(16, 'day');
+    // 默认窗口=最近一个月（与导入脚本的日期口径一致），展开「全部模块」再回溯到最早发送日
+    let from = today.subtract(30, 'day');
     if (showAll && earliestSent) {
       const earliest = dayjs(earliestSent);
       from = earliest.isAfter(floor) ? earliest : floor;
